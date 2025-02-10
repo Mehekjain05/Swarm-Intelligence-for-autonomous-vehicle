@@ -26,44 +26,50 @@ export class Car {
   }
 
   update(cars: Car[], canvasWidth: number, canvasHeight: number, laneWidth: number) {
-    // Check for nearby ambulance first
-    const nearbyAmbulance = this.detectNearbyAmbulance(cars);
-    if (nearbyAmbulance) {
-      // If ambulance is in same lane, move to adjacent lane
-      if (Math.abs(this.y - nearbyAmbulance.y) < laneWidth/2) {
-        const moveUp = this.y > laneWidth;
-        const moveDown = this.y < canvasHeight - laneWidth;
+    // Skip lane change logic for emergency vehicles
+    if (!this.isEmergency) {
+      // Check for nearby ambulance first
+      const nearbyAmbulance = this.detectNearbyAmbulance(cars);
+      if (nearbyAmbulance) {
+        // If ambulance is in same lane and close behind, move to adjacent lane
+        if (Math.abs(this.y - nearbyAmbulance.y) < laneWidth/2 &&
+            nearbyAmbulance.x < this.x &&
+            this.x - nearbyAmbulance.x < 100) {
 
-        if (moveUp) {
-          this.targetY -= laneWidth;
-          this.laneChangeInProgress = true;
-        } else if (moveDown) {
-          this.targetY += laneWidth;
-          this.laneChangeInProgress = true;
+          if (!this.laneChangeInProgress) {
+            const moveUp = this.y > laneWidth;
+            const moveDown = this.y < canvasHeight - laneWidth;
+
+            if (moveUp) {
+              this.targetY -= laneWidth;
+              this.laneChangeInProgress = true;
+            } else if (moveDown) {
+              this.targetY += laneWidth;
+              this.laneChangeInProgress = true;
+            }
+          }
+
+          // Slow down during lane change
+          this.speed = Math.max(this.speed * 0.8, 0.5);
         }
-
-        // Slow down during lane change
-        this.speed = Math.max(this.speed * 0.8, 0.5);
       }
-    }
 
-    // Only apply vertical movement when changing lanes or avoiding immediate collisions
-    const separation = this.separate(cars);
-    const laneAlignment = this.alignWithLane();
+      // Handle lane changes and alignment
+      if (this.laneChangeInProgress) {
+        // Smooth lane change movement
+        const dy = (this.targetY - this.y) * 0.1;
+        this.y += dy;
 
-    // Reduce separation force and only apply when necessary
-    if (this.laneChangeInProgress || separation.hasNearbyVehicle) {
-      // Apply weaker vertical adjustments
-      this.y += separation.dy * 0.1 + laneAlignment * 0.15;
-    } else {
-      // Gradually move back to lane center
-      this.y += laneAlignment * 0.1;
-    }
-
-    // Check if lane change is complete
-    if (this.laneChangeInProgress && Math.abs(this.y - this.targetY) < 2) {
-      this.laneChangeInProgress = false;
-      this.y = this.targetY; // Snap to exact lane position
+        // Check if lane change is complete
+        if (Math.abs(this.y - this.targetY) < 1) {
+          this.laneChangeInProgress = false;
+          this.y = this.targetY; // Snap to exact lane position
+        }
+      } else {
+        // Stay in current lane
+        const laneAlignment = (this.targetY - this.y) * 0.1;
+        this.y += laneAlignment;
+      }
     }
 
     // Keep within lane bounds
@@ -73,11 +79,11 @@ export class Car {
     this.x += this.speed;
 
     // Wrap around canvas edges
-    if (this.x < -this.width) {
-      this.x = canvasWidth + this.width;
-    }
     if (this.x > canvasWidth + this.width) {
       this.x = -this.width;
+    }
+    if (this.x < -this.width) {
+      this.x = canvasWidth + this.width;
     }
 
     // Speed management
@@ -95,35 +101,6 @@ export class Car {
       Math.abs(this.x - other.x) < 100 && // Detection range
       Math.abs(this.y - other.y) < 100 // Vertical range
     ) || null;
-  }
-
-  separate(cars: Car[]) {
-    let dy = 0;
-    let count = 0;
-    let hasNearbyVehicle = false;
-
-    cars.forEach(other => {
-      if (other !== this) {
-        const dx = Math.abs(this.x - other.x);
-        const dy2 = Math.abs(this.y - other.y);
-        const distance = Math.hypot(dx, dy2);
-
-        if (distance < 50) { // Reduced separation distance
-          dy += (this.y - other.y);
-          count++;
-          hasNearbyVehicle = true;
-        }
-      }
-    });
-
-    return { 
-      dy: count > 0 ? (dy / count) * 0.5 : 0, // Reduced separation force
-      hasNearbyVehicle 
-    };
-  }
-
-  alignWithLane() {
-    return (this.targetY - this.y) * 0.1;
   }
 
   checkCarAhead(cars: Car[]): boolean {
