@@ -1,7 +1,9 @@
 import { Car } from "./Car";
+import { Ambulance } from "./Ambulance";
 
 export class Simulation {
   cars: Car[] = [];
+  ambulance: Ambulance | null = null;
   isRunning = false;
   canvasWidth = 800;
   canvasHeight = 600;
@@ -10,12 +12,12 @@ export class Simulation {
 
   constructor() {
     this.addCars(10);
+    this.addAmbulance();
     this.start();
   }
 
   addCars(count: number) {
     for (let i = 0; i < count; i++) {
-      // Place cars in lanes
       const laneIndex = Math.floor(Math.random() * (Math.floor(this.canvasHeight / this.laneWidth)));
       const y = laneIndex * this.laneWidth + this.laneWidth / 2;
       const x = Math.random() * this.canvasWidth;
@@ -23,18 +25,31 @@ export class Simulation {
     }
   }
 
+  addAmbulance() {
+    // Place ambulance in a random lane
+    const laneIndex = Math.floor(Math.random() * (Math.floor(this.canvasHeight / this.laneWidth)));
+    const y = laneIndex * this.laneWidth + this.laneWidth / 2;
+    this.ambulance = new Ambulance(-30, y); // Start from left side
+    this.cars.push(this.ambulance);
+  }
+
   updateParams(params: { carCount: number, speed: number }) {
-    // Update car count
-    const diff = params.carCount - this.cars.length;
+    // Update regular cars
+    const diff = params.carCount - (this.cars.length - (this.ambulance ? 1 : 0));
     if (diff > 0) {
       this.addCars(diff);
     } else if (diff < 0) {
-      this.cars = this.cars.slice(0, params.carCount);
+      // Remove cars but keep the ambulance
+      const regularCars = this.cars.filter(car => !car.isEmergency);
+      const carsToKeep = regularCars.slice(0, params.carCount);
+      this.cars = this.ambulance ? [...carsToKeep, this.ambulance] : carsToKeep;
     }
 
-    // Update speed
+    // Update speed for regular cars only
     this.cars.forEach(car => {
-      car.maxSpeed = params.speed;
+      if (!car.isEmergency) {
+        car.maxSpeed = params.speed;
+      }
     });
   }
 
@@ -76,7 +91,7 @@ export class Simulation {
     for (let i = 1; i < lanes; i++) {
       const y = i * this.laneWidth;
       ctx.strokeStyle = "#ECF0F1";
-      ctx.setLineDash([20, 20]); // Dashed line pattern
+      ctx.setLineDash([20, 20]);
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(0, y);
@@ -85,7 +100,7 @@ export class Simulation {
     }
 
     // Draw solid edge lines
-    ctx.setLineDash([]); // Reset to solid line
+    ctx.setLineDash([]);
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(0, 0);
@@ -94,13 +109,14 @@ export class Simulation {
     ctx.lineTo(this.canvasWidth, this.canvasHeight);
     ctx.stroke();
 
-    // Draw cars
+    // Draw all vehicles
     this.cars.forEach(car => car.draw(ctx));
   }
 
   getAverageSpeed() {
-    if (this.cars.length === 0) return 0;
-    const totalSpeed = this.cars.reduce((sum, car) => sum + car.speed, 0);
-    return Math.round((totalSpeed / this.cars.length) * 100) / 100;
+    const regularCars = this.cars.filter(car => !car.isEmergency);
+    if (regularCars.length === 0) return 0;
+    const totalSpeed = regularCars.reduce((sum, car) => sum + car.speed, 0);
+    return Math.round((totalSpeed / regularCars.length) * 100) / 100;
   }
 }

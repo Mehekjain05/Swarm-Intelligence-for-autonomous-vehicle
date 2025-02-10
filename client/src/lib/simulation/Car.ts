@@ -8,20 +8,41 @@ export class Car {
   height: number;
   color: string;
   targetY: number;
+  isEmergency: boolean;
 
   constructor(x: number, y: number) {
     this.x = x;
     this.y = y;
-    this.targetY = y; // Target Y position (lane center)
-    this.angle = 0; // Cars start moving horizontally
+    this.targetY = y;
+    this.angle = 0;
     this.speed = 0;
     this.maxSpeed = 2;
     this.width = 30;
     this.height = 15;
     this.color = "#3498DB";
+    this.isEmergency = false;
   }
 
   update(cars: Car[], canvasWidth: number, canvasHeight: number, laneWidth: number) {
+    // Check for nearby ambulance first
+    const nearbyAmbulance = this.detectNearbyAmbulance(cars);
+    if (nearbyAmbulance) {
+      // If ambulance is in same lane, move to adjacent lane
+      if (Math.abs(this.y - nearbyAmbulance.y) < laneWidth/2) {
+        const moveUp = this.y > laneWidth; // Can we move up?
+        const moveDown = this.y < canvasHeight - laneWidth; // Can we move down?
+
+        if (moveUp) {
+          this.targetY -= laneWidth;
+        } else if (moveDown) {
+          this.targetY += laneWidth;
+        }
+
+        // Slow down to change lanes safely
+        this.speed = Math.max(this.speed * 0.8, 0.5);
+      }
+    }
+
     // Apply swarm rules
     const separation = this.separate(cars);
     const laneAlignment = this.alignWithLane();
@@ -30,10 +51,9 @@ export class Car {
     this.y += separation.dy * 0.3 + laneAlignment * 0.2;
 
     // Keep within lane bounds
-    const currentLane = Math.floor(this.y / laneWidth);
     this.y = Math.max(laneWidth/2, Math.min(canvasHeight - laneWidth/2, this.y));
 
-    // Update position (mainly horizontal movement)
+    // Update position
     this.x += this.speed;
 
     // Wrap around canvas edges
@@ -44,13 +64,21 @@ export class Car {
       this.x = -this.width;
     }
 
-    // Gradually increase speed to maxSpeed if no obstacles ahead
+    // Speed management
     const hasNearbyCarAhead = this.checkCarAhead(cars);
     if (!hasNearbyCarAhead && this.speed < this.maxSpeed) {
       this.speed += 0.1;
     } else if (hasNearbyCarAhead && this.speed > 0.5) {
       this.speed -= 0.2;
     }
+  }
+
+  detectNearbyAmbulance(cars: Car[]): Car | null {
+    return cars.find(other => 
+      other.isEmergency && 
+      Math.abs(this.x - other.x) < 100 && // Detection range
+      Math.abs(this.y - other.y) < 100 // Vertical range
+    ) || null;
   }
 
   separate(cars: Car[]) {
@@ -63,32 +91,26 @@ export class Car {
         const dy2 = Math.abs(this.y - other.y);
         const distance = Math.hypot(dx, dy2);
 
-        if (distance < 60) { // Increased separation distance
+        if (distance < 60) {
           dy += (this.y - other.y);
           count++;
         }
       }
     });
 
-    if (count > 0) {
-      return {
-        dy: dy / count
-      };
-    }
-    return { dy: 0 };
+    return { dy: count > 0 ? dy / count : 0 };
   }
 
   alignWithLane() {
-    // Return force to align with the target lane
     return (this.targetY - this.y) * 0.1;
   }
 
   checkCarAhead(cars: Car[]): boolean {
     return cars.some(other => 
       other !== this && 
-      Math.abs(this.y - other.y) < 20 && // Same lane approximately
-      other.x > this.x && // Car is ahead
-      other.x - this.x < 50 // Within detection range
+      Math.abs(this.y - other.y) < 20 &&
+      other.x > this.x && 
+      other.x - this.x < 50
     );
   }
 
