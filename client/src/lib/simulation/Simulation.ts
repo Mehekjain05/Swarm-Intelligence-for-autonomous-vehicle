@@ -6,6 +6,7 @@ export class Simulation {
   canvasWidth = 800;
   canvasHeight = 600;
   animationFrame: number | null = null;
+  laneWidth = 60;
 
   constructor() {
     this.addCars(10);
@@ -14,8 +15,10 @@ export class Simulation {
 
   addCars(count: number) {
     for (let i = 0; i < count; i++) {
+      // Place cars in lanes
+      const laneIndex = Math.floor(Math.random() * (Math.floor(this.canvasHeight / this.laneWidth)));
+      const y = laneIndex * this.laneWidth + this.laneWidth / 2;
       const x = Math.random() * this.canvasWidth;
-      const y = Math.random() * this.canvasHeight;
       this.cars.push(new Car(x, y));
     }
   }
@@ -50,37 +53,46 @@ export class Simulation {
 
   animate() {
     if (!this.isRunning) return;
-
     this.update();
     this.animationFrame = requestAnimationFrame(() => this.animate());
   }
 
   update() {
     this.cars.forEach(car => {
-      car.update(this.cars, this.canvasWidth, this.canvasHeight);
+      car.update(this.cars, this.canvasWidth, this.canvasHeight, this.laneWidth);
     });
   }
 
   draw(ctx: CanvasRenderingContext2D) {
     ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
-    
-    // Draw grid
-    ctx.strokeStyle = "#ccc";
-    ctx.lineWidth = 1;
-    
-    for (let x = 0; x < this.canvasWidth; x += 50) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, this.canvasHeight);
-      ctx.stroke();
-    }
-    
-    for (let y = 0; y < this.canvasHeight; y += 50) {
+
+    // Draw road background
+    ctx.fillStyle = "#2C3E50";
+    ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
+
+    // Draw lanes
+    const lanes = Math.floor(this.canvasHeight / this.laneWidth);
+
+    for (let i = 1; i < lanes; i++) {
+      const y = i * this.laneWidth;
+      ctx.strokeStyle = "#ECF0F1";
+      ctx.setLineDash([20, 20]); // Dashed line pattern
+      ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(0, y);
       ctx.lineTo(this.canvasWidth, y);
       ctx.stroke();
     }
+
+    // Draw solid edge lines
+    ctx.setLineDash([]); // Reset to solid line
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(this.canvasWidth, 0);
+    ctx.moveTo(0, this.canvasHeight);
+    ctx.lineTo(this.canvasWidth, this.canvasHeight);
+    ctx.stroke();
 
     // Draw cars
     this.cars.forEach(car => car.draw(ctx));
