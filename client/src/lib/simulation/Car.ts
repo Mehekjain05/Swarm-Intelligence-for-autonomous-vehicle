@@ -9,6 +9,7 @@ export class Car {
   color: string;
   targetY: number;
   isEmergency: boolean;
+  laneChangeInProgress: boolean;
 
   constructor(x: number, y: number) {
     this.x = x;
@@ -21,6 +22,7 @@ export class Car {
     this.height = 15;
     this.color = "#3498DB";
     this.isEmergency = false;
+    this.laneChangeInProgress = false;
   }
 
   update(cars: Car[], canvasWidth: number, canvasHeight: number, laneWidth: number) {
@@ -29,31 +31,45 @@ export class Car {
     if (nearbyAmbulance) {
       // If ambulance is in same lane, move to adjacent lane
       if (Math.abs(this.y - nearbyAmbulance.y) < laneWidth/2) {
-        const moveUp = this.y > laneWidth; // Can we move up?
-        const moveDown = this.y < canvasHeight - laneWidth; // Can we move down?
+        const moveUp = this.y > laneWidth;
+        const moveDown = this.y < canvasHeight - laneWidth;
 
         if (moveUp) {
           this.targetY -= laneWidth;
+          this.laneChangeInProgress = true;
         } else if (moveDown) {
           this.targetY += laneWidth;
+          this.laneChangeInProgress = true;
         }
 
-        // Slow down to change lanes safely
+        // Slow down during lane change
         this.speed = Math.max(this.speed * 0.8, 0.5);
       }
     }
 
-    // Apply swarm rules
+    // Only apply vertical movement when changing lanes or avoiding immediate collisions
     const separation = this.separate(cars);
     const laneAlignment = this.alignWithLane();
 
-    // Stronger separation force to prevent collisions
-    this.y += separation.dy * 0.3 + laneAlignment * 0.2;
+    // Reduce separation force and only apply when necessary
+    if (this.laneChangeInProgress || separation.hasNearbyVehicle) {
+      // Apply weaker vertical adjustments
+      this.y += separation.dy * 0.1 + laneAlignment * 0.15;
+    } else {
+      // Gradually move back to lane center
+      this.y += laneAlignment * 0.1;
+    }
+
+    // Check if lane change is complete
+    if (this.laneChangeInProgress && Math.abs(this.y - this.targetY) < 2) {
+      this.laneChangeInProgress = false;
+      this.y = this.targetY; // Snap to exact lane position
+    }
 
     // Keep within lane bounds
     this.y = Math.max(laneWidth/2, Math.min(canvasHeight - laneWidth/2, this.y));
 
-    // Update position
+    // Update horizontal position
     this.x += this.speed;
 
     // Wrap around canvas edges
@@ -84,6 +100,7 @@ export class Car {
   separate(cars: Car[]) {
     let dy = 0;
     let count = 0;
+    let hasNearbyVehicle = false;
 
     cars.forEach(other => {
       if (other !== this) {
@@ -91,14 +108,18 @@ export class Car {
         const dy2 = Math.abs(this.y - other.y);
         const distance = Math.hypot(dx, dy2);
 
-        if (distance < 60) {
+        if (distance < 50) { // Reduced separation distance
           dy += (this.y - other.y);
           count++;
+          hasNearbyVehicle = true;
         }
       }
     });
 
-    return { dy: count > 0 ? dy / count : 0 };
+    return { 
+      dy: count > 0 ? (dy / count) * 0.5 : 0, // Reduced separation force
+      hasNearbyVehicle 
+    };
   }
 
   alignWithLane() {
