@@ -19,10 +19,10 @@ export default function Canvas({ simulation }: CanvasProps) {
     const resizeCanvas = () => {
       const container = canvas.parentElement;
       if (!container) return;
-      
+
       canvas.width = container.clientWidth;
-      canvas.height = Math.min(600, window.innerHeight - 200);
-      
+      canvas.height = Math.min(800, window.innerHeight - 100); // Increased height
+
       simulation.canvasWidth = canvas.width;
       simulation.canvasHeight = canvas.height;
     };

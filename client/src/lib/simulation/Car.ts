@@ -105,18 +105,14 @@ export class Car {
     ) || null;
   }
 
-  checkCarAhead(cars: Car[]): boolean {
-    return cars.some(other => 
-      other !== this && 
-      Math.abs(this.y - other.y) < 20 &&
-      other.x > this.x && 
-      other.x - this.x < 50
-    );
-  }
-
   draw(ctx: CanvasRenderingContext2D) {
     ctx.save();
     ctx.translate(this.x, this.y);
+
+    // Apply 45-degree rotation for cars in merge lane
+    if (this.inMergeLane) {
+      ctx.rotate(Math.PI / 4); // 45 degrees in radians
+    }
 
     // Draw car body
     ctx.fillStyle = this.color;
@@ -133,5 +129,14 @@ export class Car {
     ctx.fillRect(-this.width/2, this.height/2 - 3, 2, 3);
 
     ctx.restore();
+  }
+
+  checkCarAhead(cars: Car[]): boolean {
+    return cars.some(other => 
+      other !== this && 
+      Math.abs(this.y - other.y) < 20 &&
+      other.x > this.x && 
+      other.x - this.x < 50
+    );
   }
 }

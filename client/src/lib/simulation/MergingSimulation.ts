@@ -16,7 +16,7 @@ export class MergingSimulation {
     this.mainLaneY = this.canvasHeight * 0.6; // Main lane position
     this.mergeZoneStart = this.canvasWidth * 0.3;
     this.mergeZoneEnd = this.canvasWidth * 0.7;
-    
+
     // Calculate merge lane coordinates (45-degree angle)
     this.mergeLaneStart = {
       x: this.mergeZoneStart,
@@ -140,7 +140,7 @@ export class MergingSimulation {
     ctx.strokeStyle = "#ECF0F1";
     ctx.lineWidth = 2;
     ctx.setLineDash([20, 20]);
-    
+
     // Main lane borders
     ctx.beginPath();
     ctx.moveTo(0, this.mainLaneY - 30);
@@ -167,7 +167,7 @@ export class MergingSimulation {
     ctx.setLineDash([]);
     ctx.strokeStyle = "#E74C3C";
     ctx.lineWidth = 3;
-    
+
     // Draw all vehicles
     this.cars.forEach(car => car.draw(ctx));
   }
