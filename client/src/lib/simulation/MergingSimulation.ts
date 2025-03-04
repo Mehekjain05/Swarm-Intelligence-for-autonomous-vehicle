@@ -11,6 +11,7 @@ export class MergingSimulation {
   mergeLaneEnd: { x: number, y: number };
   mergeZoneStart: number;
   mergeZoneEnd: number;
+  safeDistance = 60; // Minimum safe distance between vehicles
 
   constructor() {
     this.mainLaneY = this.canvasHeight * 0.6; // Main lane position
@@ -70,15 +71,22 @@ export class MergingSimulation {
   }
 
   update() {
+    // Count vehicles in main lane merge zone
+    const mainLaneTrafficCount = this.cars.filter(car => 
+      !car.inMergeLane && 
+      car.x >= this.mergeZoneStart - 100 && 
+      car.x <= this.mergeZoneEnd + 100
+    ).length;
+
     this.cars.forEach(car => {
-      this.updateCarPosition(car);
+      this.updateCarPosition(car, mainLaneTrafficCount);
     });
 
     // Sort cars by x position for proper rendering
     this.cars.sort((a, b) => a.x - b.x);
   }
 
-  updateCarPosition(car: Car) {
+  updateCarPosition(car: Car, mainLaneTrafficCount: number) {
     if (car.inMergeLane) {
       // Calculate position along merge lane
       if (car.x >= this.mergeZoneEnd) {
@@ -90,23 +98,40 @@ export class MergingSimulation {
                         (this.mergeLaneEnd.x - this.mergeLaneStart.x);
         car.y = this.mergeLaneStart.y + 
                 (this.mergeLaneEnd.y - this.mergeLaneStart.y) * progress;
+
+        // Adjust speed based on main lane traffic
+        if (mainLaneTrafficCount > 3) {
+          // Slow down significantly if main lane is congested
+          car.speed = Math.max(car.speed * 0.7, 0.3);
+        }
       }
     }
 
-    // Check for cars ahead and adjust speed
+    // Check for vehicles ahead and adjust speed
     const carsAhead = this.cars.filter(other => 
       other !== car && 
       other.x > car.x && 
-      other.x - car.x < 100 &&
+      other.x - car.x < this.safeDistance * 2 &&
       ((!car.inMergeLane && !other.inMergeLane) || // Both in main lane
        (car.inMergeLane && other.inMergeLane && // Both in merge lane
         Math.abs(car.y - other.y) < 30))
     );
 
-    // Adjust speed based on cars ahead
-    if (carsAhead.length > 0) {
-      car.speed = Math.max(car.speed * 0.9, 0.5);
+    // Check for merging conflicts
+    const mergingConflicts = this.cars.filter(other =>
+      other !== car &&
+      Math.abs(other.x - car.x) < this.safeDistance &&
+      ((car.inMergeLane && !other.inMergeLane && car.x > this.mergeZoneStart) ||
+       (!car.inMergeLane && other.inMergeLane && other.x > this.mergeZoneStart))
+    );
+
+    // Adjust speed based on surrounding traffic
+    if (carsAhead.length > 0 || mergingConflicts.length > 0) {
+      // Stronger slowdown when multiple vehicles are nearby
+      const slowdownFactor = 0.7 - (carsAhead.length + mergingConflicts.length) * 0.1;
+      car.speed = Math.max(car.speed * slowdownFactor, 0.3);
     } else {
+      // Accelerate if path is clear
       car.speed = Math.min(car.speed + 0.1, car.maxSpeed);
     }
 
