@@ -10,6 +10,7 @@ export class Car {
   targetY: number;
   isEmergency: boolean;
   laneChangeInProgress: boolean;
+  inMergeLane: boolean;
 
   constructor(x: number, y: number) {
     this.x = x;
@@ -23,6 +24,7 @@ export class Car {
     this.color = "#3498DB";
     this.isEmergency = false;
     this.laneChangeInProgress = false;
+    this.inMergeLane = false;
   }
 
   update(cars: Car[], canvasWidth: number, canvasHeight: number, laneWidth: number) {
